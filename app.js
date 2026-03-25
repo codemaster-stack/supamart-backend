@@ -5,6 +5,11 @@ const dotenv = require('dotenv');
 const rateLimit = require('express-rate-limit');
 const authRoutes = require('./routes/auth.routes');
 const storeRoutes = require('./routes/store.routes');
+const productRoutes = require('./routes/product.routes');
+const currencyRoutes = require('./routes/currency.routes');
+const orderRoutes = require('./routes/order.routes');
+const walletRoutes = require('./routes/wallet.routes');
+const adminRoutes = require('./routes/admin.routes');
 
 dotenv.config();
 
@@ -38,6 +43,11 @@ app.get('/', (req, res) => {
 // ─── Routes ───
 app.use('/api/auth', authRoutes);
 app.use('/api/stores', storeRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/currency', currencyRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/wallets', walletRoutes);
+app.use('/api/admin', adminRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
