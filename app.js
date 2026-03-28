@@ -21,7 +21,7 @@ app.use(helmet());
 // CORS — allows your frontend (Vercel) to talk to this backend
 const allowedOrigins = [
   process.env.CLIENT_URL,
-  'http://127.0.0.1:5500',
+  'supamart-frontend-g449.vercel.app',
   'http://localhost:5500'
 ];
 
