@@ -35,12 +35,14 @@ const register = async (req, res) => {
     const userRole = allowedRoles.includes(role) ? role : 'buyer';
 
     // Create user
-    const user = await User.create({
+   // Create user
+    const user = new User({
       name,
       email,
       password,
       role: userRole
     });
+    await user.save();
 
     // If seller, create 4 wallets automatically
     if (userRole === 'seller') {
