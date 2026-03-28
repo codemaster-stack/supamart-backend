@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: supamart-backend
+    env: node
+    buildCommand: npm install
+    startCommand: node app.js
+    envVars:
+      - key: NODE_ENV
+        value: production

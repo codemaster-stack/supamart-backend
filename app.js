@@ -19,11 +19,22 @@ const app = express();
 app.use(helmet());
 
 // CORS — allows your frontend (Vercel) to talk to this backend
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  'http://127.0.0.1:5500',
+  'http://localhost:5500'
+];
+
 app.use(cors({
-  origin: process.env.CLIENT_URL,
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
-
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -54,4 +65,13 @@ app.listen(PORT, () => {
   console.log(`✅ Supamart backend running on port ${PORT}`);
 });
 
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({
+    message: process.env.NODE_ENV === 'production'
+      ? 'Something went wrong'
+      : err.message
+  });
+});
 module.exports = app;
