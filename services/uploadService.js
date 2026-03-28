@@ -28,14 +28,26 @@ const productStorage = new CloudinaryStorage({
   }
 });
 
+// File filter — only allow images
+const imageFilter = (req, file, cb) => {
+  const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  if (allowed.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed'), false);
+  }
+};
+
 const uploadLogo = multer({
   storage: logoStorage,
-  limits: { fileSize: 2 * 1024 * 1024 } // 2MB max
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: imageFilter
 });
 
 const uploadProductImages = multer({
   storage: productStorage,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB max
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: imageFilter
 });
 
 module.exports = { uploadLogo, uploadProductImages };

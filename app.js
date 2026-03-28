@@ -72,9 +72,28 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/wallets', walletRoutes);
 app.use('/api/admin', adminRoutes);
 
+
 // Global error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
+
+  // Handle Multer errors specifically
+  if (err.name === 'MulterError') {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        message: 'File too large. Maximum size is 5MB per image'
+      });
+    }
+    if (err.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({
+        message: 'Too many files. Maximum is 5 images'
+      });
+    }
+    return res.status(400).json({
+      message: `Upload error: ${err.message}`
+    });
+  }
+
   res.status(500).json({
     message: process.env.NODE_ENV === 'production'
       ? 'Something went wrong'

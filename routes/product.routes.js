@@ -15,6 +15,7 @@ const { uploadProductImages } = require('../services/uploadService');
 // Public routes
 router.get('/', getAllProducts);
 router.get('/store/:storeId', getProductsByStore);
+router.get('/seller/my-products', protect, requireRole('seller'), getMyProducts);
 router.get('/:id', getProduct);
 
 // Seller protected routes
@@ -25,7 +26,6 @@ router.post(
   uploadProductImages.array('images', 5),
   createProduct
 );
-router.get('/seller/my-products', protect, requireRole('seller'), getMyProducts);
 router.put(
   '/:id',
   protect,
