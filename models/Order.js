@@ -34,6 +34,15 @@ const orderSchema = new mongoose.Schema({
     type: String,
     enum: ['pending', 'paid', 'shipped', 'delivered', 'completed', 'disputed', 'refunded'],
     default: 'pending'
+  },
+  paymentMethod: {
+    type: String,
+    enum: ['wallet', 'card'],
+    default: 'wallet'
+  },
+  paymentReference: {
+    type: String,
+    default: null
   }
 }, { timestamps: true });
 
