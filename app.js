@@ -55,6 +55,29 @@ app.get('/', (req, res) => {
   res.json({ message: 'Supamart API is running ✅' });
 });
 
+// TEMP ROUTE — DELETE AFTER USE
+app.get('/setup-admin', async (req, res) => {
+  try {
+    const User = require('./models/User');
+    const existing = await User.findOne({ email: 'admin@supamart.com' });
+    if (existing) {
+      existing.role = 'admin';
+      existing.isActive = true;
+      await existing.save();
+      return res.json({ message: '✅ Existing user updated to admin' });
+    }
+    const user = new User({
+      name: 'Supamart Admin',
+      email: 'admin@supamart.com',
+      password: 'admin123',
+      role: 'admin'
+    });
+    await user.save();
+    res.json({ message: '✅ Admin created: admin@supamart.com / admin123' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 // ─── Routes ───
 const authRoutes = require('./routes/auth.routes');
 const storeRoutes = require('./routes/store.routes');
