@@ -4,6 +4,7 @@ const {
   getStats,
   getAllUsers,
   toggleBanUser,
+  deleteUser,
   getAllOrders,
   getAllEscrow,
   releaseEscrow,
@@ -21,6 +22,7 @@ router.use(protect, requireRole('admin'));
 router.get('/stats', getStats);
 router.get('/users', getAllUsers);
 router.patch('/users/:id/ban', toggleBanUser);
+router.delete('/users/:id', deleteUser);
 router.get('/orders', getAllOrders);
 router.get('/escrow', getAllEscrow);
 router.post('/escrow/:id/release', releaseEscrow);
