@@ -8,11 +8,14 @@ const {
   getAllEscrow,
   releaseEscrow,
   refundEscrow,
-  adminDeleteProduct
+  adminDeleteProduct,
+  getAllDisputes,
+  getDispute,
+  addDisputeMessage,
+  resolveDispute
 } = require('../controllers/adminController');
 const { protect, requireRole } = require('../middleware/authMiddleware');
 
-// All admin routes require admin role
 router.use(protect, requireRole('admin'));
 
 router.get('/stats', getStats);
@@ -23,5 +26,9 @@ router.get('/escrow', getAllEscrow);
 router.post('/escrow/:id/release', releaseEscrow);
 router.post('/escrow/:id/refund', refundEscrow);
 router.delete('/products/:id', adminDeleteProduct);
+router.get('/disputes', getAllDisputes);
+router.get('/disputes/:id', getDispute);
+router.post('/disputes/:id/message', addDisputeMessage);
+router.post('/disputes/:id/resolve', resolveDispute);
 
 module.exports = router;

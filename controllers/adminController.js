@@ -238,6 +238,213 @@ const adminDeleteProduct = async (req, res) => {
   }
 };
 
+const Dispute = require('../models/Dispute');
+
+// ─── GET ALL DISPUTES ─────────────────────────────────────
+const getAllDisputes = async (req, res) => {
+  try {
+    const disputes = await Dispute.find()
+      .populate('orderId')
+      .populate('raisedBy', 'name email')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ disputes });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ─── GET SINGLE DISPUTE ───────────────────────────────────
+const getDispute = async (req, res) => {
+  try {
+    const dispute = await Dispute.findById(req.params.id)
+      .populate('raisedBy', 'name email')
+      .populate({
+        path: 'orderId',
+        populate: [
+          { path: 'buyerId', select: 'name email' },
+          { path: 'sellerId', select: 'name email' },
+          { path: 'productId', select: 'name images' }
+        ]
+      });
+
+    if (!dispute) {
+      return res.status(404).json({ message: 'Dispute not found' });
+    }
+
+    res.status(200).json({ dispute });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ─── ADD MESSAGE TO DISPUTE ───────────────────────────────
+const addDisputeMessage = async (req, res) => {
+  try {
+    const { message } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ message: 'Message is required' });
+    }
+
+    const dispute = await Dispute.findById(req.params.id);
+    if (!dispute) {
+      return res.status(404).json({ message: 'Dispute not found' });
+    }
+
+    dispute.messages.push({
+      senderId: req.user.id,
+      senderName: req.user.name,
+      senderRole: req.user.role,
+      message
+    });
+
+    dispute.status = 'under_review';
+    await dispute.save();
+
+    // Notify buyer and seller
+    const order = await Order.findById(dispute.orderId);
+    if (order) {
+      await Notification.create({
+        userId: order.buyerId,
+        type: 'dispute_update',
+        message: `Admin has responded to your dispute for order #${order._id.toString().slice(-6).toUpperCase()}.`
+      });
+      await Notification.create({
+        userId: order.sellerId,
+        type: 'dispute_update',
+        message: `Admin has reviewed the dispute for order #${order._id.toString().slice(-6).toUpperCase()}.`
+      });
+    }
+
+    res.status(200).json({
+      message: 'Message sent',
+      dispute
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ─── RESOLVE DISPUTE ──────────────────────────────────────
+const resolveDispute = async (req, res) => {
+  try {
+    const { resolution } = req.body;
+    // resolution = 'seller' (release to seller) or 'buyer' (refund buyer)
+
+    const dispute = await Dispute.findById(req.params.id);
+    if (!dispute) {
+      return res.status(404).json({ message: 'Dispute not found' });
+    }
+
+    const escrow = await Escrow.findOne({ orderId: dispute.orderId });
+    if (!escrow) {
+      return res.status(404).json({ message: 'Escrow not found' });
+    }
+
+    const order = await Order.findById(dispute.orderId);
+
+    if (resolution === 'seller') {
+      // Release to seller
+      let sellerWallet = await Wallet.findOne({
+        userId: order.sellerId,
+        currency: escrow.currency
+      });
+
+      if (!sellerWallet) {
+        sellerWallet = await Wallet.create({
+          userId: order.sellerId,
+          currency: escrow.currency,
+          balance: 0
+        });
+      }
+
+      sellerWallet.balance += escrow.amountHeld;
+      await sellerWallet.save();
+
+      escrow.status = 'released';
+      escrow.releasedAt = new Date();
+      await escrow.save();
+
+      order.status = 'completed';
+      await order.save();
+
+      dispute.status = 'resolved_seller';
+      dispute.messages.push({
+        senderId: req.user.id,
+        senderName: req.user.name,
+        senderRole: 'admin',
+        message: `Dispute resolved. Funds released to seller.`
+      });
+      await dispute.save();
+
+      await Notification.create({
+        userId: order.sellerId,
+        type: 'dispute_resolved',
+        message: `Dispute resolved in your favour. ${escrow.currency} ${escrow.amountHeld.toFixed(2)} released to your wallet.`
+      });
+
+      await Notification.create({
+        userId: order.buyerId,
+        type: 'dispute_resolved',
+        message: `Dispute for order #${order._id.toString().slice(-6).toUpperCase()} has been resolved. Funds released to seller.`
+      });
+
+    } else if (resolution === 'buyer') {
+      // Refund buyer
+      let buyerWallet = await Wallet.findOne({
+        userId: order.buyerId,
+        currency: escrow.currency
+      });
+
+      if (!buyerWallet) {
+        buyerWallet = await Wallet.create({
+          userId: order.buyerId,
+          currency: escrow.currency,
+          balance: 0
+        });
+      }
+
+      buyerWallet.balance += escrow.amountHeld;
+      await buyerWallet.save();
+
+      escrow.status = 'refunded';
+      escrow.releasedAt = new Date();
+      await escrow.save();
+
+      order.status = 'refunded';
+      await order.save();
+
+      dispute.status = 'resolved_buyer';
+      dispute.messages.push({
+        senderId: req.user.id,
+        senderName: req.user.name,
+        senderRole: 'admin',
+        message: `Dispute resolved. Buyer has been refunded.`
+      });
+      await dispute.save();
+
+      await Notification.create({
+        userId: order.buyerId,
+        type: 'dispute_resolved',
+        message: `Dispute resolved in your favour. ${escrow.currency} ${escrow.amountHeld.toFixed(2)} refunded to your wallet.`
+      });
+
+      await Notification.create({
+        userId: order.sellerId,
+        type: 'dispute_resolved',
+        message: `Dispute for order #${order._id.toString().slice(-6).toUpperCase()} resolved. Buyer was refunded.`
+      });
+    }
+
+    res.status(200).json({ message: 'Dispute resolved successfully' });
+
+  } catch (error) {
+    console.error('Resolve dispute error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   getStats,
   getAllUsers,
@@ -246,5 +453,9 @@ module.exports = {
   getAllEscrow,
   releaseEscrow,
   refundEscrow,
-  adminDeleteProduct
+  adminDeleteProduct,
+  getAllDisputes,
+  getDispute,
+  addDisputeMessage,
+  resolveDispute
 };

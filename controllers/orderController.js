@@ -234,6 +234,7 @@ const confirmDelivery = async (req, res) => {
 // PATCH /api/orders/:id/dispute
 const raiseDispute = async (req, res) => {
   try {
+    const { reason } = req.body;
     const order = await Order.findById(req.params.id);
 
     if (!order) {
@@ -241,25 +242,38 @@ const raiseDispute = async (req, res) => {
     }
 
     if (order.buyerId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Only the buyer can raise a dispute' });
+      return res.status(403).json({
+        message: 'Only the buyer can raise a dispute'
+      });
     }
 
     if (['completed', 'refunded', 'disputed'].includes(order.status)) {
-      return res.status(400).json({
-        message: 'Cannot dispute this order'
-      });
+      return res.status(400).json({ message: 'Cannot dispute this order' });
     }
 
     order.status = 'disputed';
     await order.save();
 
-    // Mark escrow as disputed
     await Escrow.findOneAndUpdate(
       { orderId: order._id },
       { status: 'disputed' }
     );
 
-    // Notify admin (placeholder — creates notification for all admins)
+    // Create dispute record
+    const Dispute = require('../models/Dispute');
+    await Dispute.create({
+      orderId: order._id,
+      raisedBy: req.user.id,
+      reason: reason || 'No reason provided',
+      messages: [{
+        senderId: req.user.id,
+        senderName: req.user.name,
+        senderRole: 'buyer',
+        message: reason || 'Dispute raised by buyer'
+      }]
+    });
+
+    // Notify seller
     await Notification.create({
       userId: order.sellerId,
       type: 'dispute_raised',
@@ -272,10 +286,10 @@ const raiseDispute = async (req, res) => {
     });
 
   } catch (error) {
+    console.error('Raise dispute error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
-
 // ─── MARK AS SHIPPED (Seller) ─────────────────────────────
 // PATCH /api/orders/:id/ship
 const markShipped = async (req, res) => {
