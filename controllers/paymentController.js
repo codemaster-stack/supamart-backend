@@ -3,21 +3,13 @@ const Product = require('../models/Product');
 const Escrow = require('../models/Escrow');
 const Wallet = require('../models/Wallet');
 const Notification = require('../models/Notification');
+const paystackService = require('../services/paystackService');
 const {
-  initializePayment,
-  verifyPayment,
-  generateReference
-} = require('../services/paystackService');
-const { getExchangeRates, computePrice } = require('../services/currencyService');
-const {
-  initializePayment,
-  verifyPayment,
-  generateReference,
-  createVirtualAccount
-} = require('../services/paystackService');
+  getExchangeRates,
+  computePrice
+} = require('../services/currencyService');
 
 // ─── INITIALIZE CARD PAYMENT ──────────────────────────────
-// POST /api/payments/initialize
 const initializeCardPayment = async (req, res) => {
   try {
     const { productId, quantity, currency } = req.body;
@@ -28,14 +20,6 @@ const initializeCardPayment = async (req, res) => {
       });
     }
 
-    // Only NGN supported on Paystack test for now
-    // USD/GBP/EUR requires Paystack international
-    const supportedCurrencies = ['NGN', 'USD', 'GBP', 'EUR'];
-    if (!supportedCurrencies.includes(currency)) {
-      return res.status(400).json({ message: 'Invalid currency' });
-    }
-
-    // Get product
     const product = await Product.findById(productId)
       .populate('storeId');
 
@@ -50,16 +34,11 @@ const initializeCardPayment = async (req, res) => {
     }
 
     const qty = parseInt(quantity) || 1;
-
-    // Compute price
     const rates = await getExchangeRates();
     const unitPrice = computePrice(product.basePriceNGN, currency, rates);
     const totalAmount = unitPrice * qty;
+    const reference = paystackService.generateReference(req.user.id);
 
-    // Generate unique reference
-    const reference = generateReference(req.user.id);
-
-    // Store pending order info in metadata
     const metadata = {
       userId: req.user.id,
       productId: product._id.toString(),
@@ -67,14 +46,14 @@ const initializeCardPayment = async (req, res) => {
       currency,
       totalAmount,
       productName: product.name,
-      storeName: product.storeId?.businessName || 'Unknown Store'
+      storeName: product.storeId?.businessName || ''
     };
 
-    // Initialize Paystack payment
     const callbackUrl =
-      `${process.env.CLIENT_URL}/pages/checkout/verify.html?reference=${reference}`;
+      `${process.env.CLIENT_URL}/pages/checkout/verify.html` +
+      `?reference=${reference}`;
 
-    const paystackResponse = await initializePayment({
+    const paystackResponse = await paystackService.initializePayment({
       email: req.user.email,
       amount: totalAmount,
       currency,
@@ -92,31 +71,21 @@ const initializeCardPayment = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Initialize payment error:', error);
+    console.error('Initialize card payment error:', error.message);
     res.status(500).json({
       message: error.message || 'Payment initialization failed'
     });
   }
 };
 
-
 // ─── INITIALIZE BANK TRANSFER ─────────────────────────────
-// POST /api/payments/bank-transfer
 const initializeBankTransfer = async (req, res) => {
   try {
-    const { productId, quantity, currency } = req.body;
+    const { productId, quantity } = req.body;
+    const currency = 'NGN';
 
-    if (!productId || !currency) {
-      return res.status(400).json({
-        message: 'Product and currency are required'
-      });
-    }
-
-    // Bank transfer only works for NGN on Paystack
-    if (currency !== 'NGN') {
-      return res.status(400).json({
-        message: 'Bank transfer is only available for NGN payments'
-      });
+    if (!productId) {
+      return res.status(400).json({ message: 'Product is required' });
     }
 
     const product = await Product.findById(productId)
@@ -136,8 +105,7 @@ const initializeBankTransfer = async (req, res) => {
     const rates = await getExchangeRates();
     const unitPrice = computePrice(product.basePriceNGN, currency, rates);
     const totalAmount = unitPrice * qty;
-
-    const reference = generateReference(req.user.id);
+    const reference = paystackService.generateReference(req.user.id);
 
     const metadata = {
       userId: req.user.id,
@@ -146,13 +114,14 @@ const initializeBankTransfer = async (req, res) => {
       currency,
       totalAmount,
       productName: product.name,
-      storeName: product.storeId?.businessName || 'Unknown Store'
+      storeName: product.storeId?.businessName || ''
     };
 
     const callbackUrl =
-      `${process.env.CLIENT_URL}/pages/checkout/verify.html?reference=${reference}`;
+      `${process.env.CLIENT_URL}/pages/checkout/verify.html` +
+      `?reference=${reference}`;
 
-    const paystackResponse = await createVirtualAccount({
+    const paystackResponse = await paystackService.createVirtualAccount({
       email: req.user.email,
       amount: totalAmount,
       currency,
@@ -161,35 +130,24 @@ const initializeBankTransfer = async (req, res) => {
       callbackUrl
     });
 
-    // Extract bank transfer details from response
-    const transferData = paystackResponse.data;
-
     res.status(200).json({
       message: 'Bank transfer initialized',
+      authorizationUrl: paystackResponse.data.authorization_url,
       reference,
       amount: totalAmount,
       currency,
-      authorizationUrl: transferData.authorization_url,
-      accessCode: transferData.access_code,
-      transferDetails: {
-        bank: transferData.bank?.name || 'See payment page',
-        accountNumber: transferData.bank?.account_number || 'See payment page',
-        accountName: transferData.bank?.account_name || 'Paystack',
-        amount: totalAmount,
-        expiresIn: '30 minutes'
-      }
+      accessCode: paystackResponse.data.access_code
     });
 
   } catch (error) {
-    console.error('Bank transfer init error:', error);
+    console.error('Bank transfer error:', error.message);
     res.status(500).json({
       message: error.message || 'Bank transfer initialization failed'
     });
   }
 };
 
-// ─── VERIFY CARD PAYMENT ──────────────────────────────────
-// POST /api/payments/verify
+// ─── VERIFY PAYMENT ───────────────────────────────────────
 const verifyCardPayment = async (req, res) => {
   try {
     const { reference } = req.body;
@@ -198,8 +156,7 @@ const verifyCardPayment = async (req, res) => {
       return res.status(400).json({ message: 'Reference is required' });
     }
 
-    // Verify with Paystack
-    const paystackResponse = await verifyPayment(reference);
+    const paystackResponse = await paystackService.verifyPayment(reference);
 
     if (paystackResponse.data.status !== 'success') {
       return res.status(400).json({
@@ -209,18 +166,17 @@ const verifyCardPayment = async (req, res) => {
     }
 
     const metadata = paystackResponse.data.metadata;
-    const {
-      userId,
-      productId,
-      quantity,
-      currency,
-      totalAmount
-    } = metadata;
+
+    if (!metadata || !metadata.productId) {
+      return res.status(400).json({
+        message: 'Invalid payment metadata'
+      });
+    }
+
+    const { userId, productId, quantity, currency, totalAmount } = metadata;
 
     // Prevent double processing
     const existingOrder = await Order.findOne({
-      buyerId: userId,
-      productId,
       paymentReference: reference
     });
 
@@ -231,13 +187,11 @@ const verifyCardPayment = async (req, res) => {
       });
     }
 
-    // Get product
     const product = await Product.findById(productId);
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Create order
     const order = await Order.create({
       buyerId: userId,
       sellerId: product.sellerId,
@@ -250,7 +204,6 @@ const verifyCardPayment = async (req, res) => {
       paymentReference: reference
     });
 
-    // Create escrow
     await Escrow.create({
       orderId: order._id,
       currency,
@@ -258,11 +211,10 @@ const verifyCardPayment = async (req, res) => {
       status: 'held'
     });
 
-    // Notify seller
     await Notification.create({
       userId: product.sellerId,
       type: 'new_order',
-      message: `New order for "${product.name}" — ${currency} ${totalAmount.toFixed(2)}. Payment verified via card. Funds in escrow.`
+      message: `New order for "${product.name}" — ${currency} ${totalAmount.toFixed(2)} via card. Funds in escrow.`
     });
 
     res.status(201).json({
@@ -271,7 +223,7 @@ const verifyCardPayment = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Verify payment error:', error);
+    console.error('Verify payment error:', error.message);
     res.status(500).json({
       message: error.message || 'Payment verification failed'
     });
@@ -279,16 +231,15 @@ const verifyCardPayment = async (req, res) => {
 };
 
 // ─── PAYSTACK WEBHOOK ─────────────────────────────────────
-// POST /api/payments/webhook
 const paystackWebhook = async (req, res) => {
   try {
     const crypto = require('crypto');
     const secret = process.env.PAYSTACK_SECRET_KEY;
+    const body = JSON.stringify(req.body);
 
-    // Verify webhook signature
     const hash = crypto
       .createHmac('sha512', secret)
-      .update(JSON.stringify(req.body))
+      .update(body)
       .digest('hex');
 
     if (hash !== req.headers['x-paystack-signature']) {
@@ -301,20 +252,12 @@ const paystackWebhook = async (req, res) => {
       const reference = event.data.reference;
       const metadata = event.data.metadata;
 
-      // Check if order already exists
       const existingOrder = await Order.findOne({
         paymentReference: reference
       });
 
-      if (!existingOrder && metadata) {
-        const {
-          userId,
-          productId,
-          quantity,
-          currency,
-          totalAmount
-        } = metadata;
-
+      if (!existingOrder && metadata && metadata.productId) {
+        const { userId, productId, quantity, currency, totalAmount } = metadata;
         const product = await Product.findById(productId);
 
         if (product) {
@@ -340,7 +283,7 @@ const paystackWebhook = async (req, res) => {
           await Notification.create({
             userId: product.sellerId,
             type: 'new_order',
-            message: `New order for "${product.name}" — ${currency} ${totalAmount.toFixed(2)} via card.`
+            message: `New order for "${product.name}" — payment confirmed via webhook.`
           });
         }
       }
@@ -349,8 +292,8 @@ const paystackWebhook = async (req, res) => {
     res.status(200).json({ received: true });
 
   } catch (error) {
-    console.error('Webhook error:', error);
-    res.status(500).json({ message: 'Webhook error' });
+    console.error('Webhook error:', error.message);
+    res.status(200).json({ received: true });
   }
 };
 
