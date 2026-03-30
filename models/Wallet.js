@@ -11,10 +11,14 @@ const walletSchema = new mongoose.Schema({
     enum: ['NGN', 'USD', 'GBP', 'EUR'],
     required: true
   },
-  balance: {
+ balance: {
     type: Number,
     default: 0,
     min: 0
+  },
+  lastFundingReference: {
+    type: String,
+    default: null
   }
 }, { timestamps: true });
 

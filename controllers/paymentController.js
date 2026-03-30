@@ -3,7 +3,12 @@ const Product = require('../models/Product');
 const Escrow = require('../models/Escrow');
 const Wallet = require('../models/Wallet');
 const Notification = require('../models/Notification');
-const paystackService = require('../services/paystackService');
+const {
+  initializePayment,
+  verifyPayment,
+  generateReference,
+  createVirtualAccount
+} = require('../services/paystackService');
 const {
   getExchangeRates,
   computePrice
@@ -35,9 +40,13 @@ const initializeCardPayment = async (req, res) => {
 
     const qty = parseInt(quantity) || 1;
     const rates = await getExchangeRates();
-    const unitPrice = computePrice(product.basePriceNGN, currency, rates);
+    const unitPrice = computePrice(
+      product.basePriceNGN,
+      currency,
+      rates
+    );
     const totalAmount = unitPrice * qty;
-    const reference = paystackService.generateReference(req.user.id);
+    const reference = generateReference(req.user.id);
 
     const metadata = {
       userId: req.user.id,
@@ -53,7 +62,7 @@ const initializeCardPayment = async (req, res) => {
       `${process.env.CLIENT_URL}/pages/checkout/verify.html` +
       `?reference=${reference}`;
 
-    const paystackResponse = await paystackService.initializePayment({
+    const paystackResponse = await initializePayment({
       email: req.user.email,
       amount: totalAmount,
       currency,
@@ -105,7 +114,7 @@ const initializeBankTransfer = async (req, res) => {
     const rates = await getExchangeRates();
     const unitPrice = computePrice(product.basePriceNGN, currency, rates);
     const totalAmount = unitPrice * qty;
-    const reference = paystackService.generateReference(req.user.id);
+    const reference = generateReference(req.user.id);
 
     const metadata = {
       userId: req.user.id,
@@ -121,7 +130,7 @@ const initializeBankTransfer = async (req, res) => {
       `${process.env.CLIENT_URL}/pages/checkout/verify.html` +
       `?reference=${reference}`;
 
-    const paystackResponse = await paystackService.createVirtualAccount({
+    const paystackResponse = await createVirtualAccount({
       email: req.user.email,
       amount: totalAmount,
       currency,
@@ -156,7 +165,7 @@ const verifyCardPayment = async (req, res) => {
       return res.status(400).json({ message: 'Reference is required' });
     }
 
-    const paystackResponse = await paystackService.verifyPayment(reference);
+    const paystackResponse = await verifyPayment(reference);
 
     if (paystackResponse.data.status !== 'success') {
       return res.status(400).json({
@@ -173,7 +182,13 @@ const verifyCardPayment = async (req, res) => {
       });
     }
 
-    const { userId, productId, quantity, currency, totalAmount } = metadata;
+    const {
+      userId,
+      productId,
+      quantity,
+      currency,
+      totalAmount
+    } = metadata;
 
     // Prevent double processing
     const existingOrder = await Order.findOne({
@@ -257,7 +272,14 @@ const paystackWebhook = async (req, res) => {
       });
 
       if (!existingOrder && metadata && metadata.productId) {
-        const { userId, productId, quantity, currency, totalAmount } = metadata;
+        const {
+          userId,
+          productId,
+          quantity,
+          currency,
+          totalAmount
+        } = metadata;
+
         const product = await Product.findById(productId);
 
         if (product) {

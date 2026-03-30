@@ -8,12 +8,8 @@ const {
 } = require('../controllers/paymentController');
 const { protect } = require('../middleware/authMiddleware');
 
-// Webhook — raw body no auth
-router.post(
-  '/webhook',
-  express.raw({ type: 'application/json' }),
-  paystackWebhook
-);
+// Webhook — no auth needed
+router.post('/webhook', paystackWebhook);
 
 // Protected routes
 router.post('/initialize', protect, initializeCardPayment);
