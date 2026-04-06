@@ -79,6 +79,7 @@ app.get('/setup-admin', async (req, res) => {
   }
 });
 // ─── Routes ───
+// ─── Routes ───
 const authRoutes = require('./routes/auth.routes');
 const storeRoutes = require('./routes/store.routes');
 const productRoutes = require('./routes/product.routes');
@@ -86,6 +87,7 @@ const currencyRoutes = require('./routes/currency.routes');
 const orderRoutes = require('./routes/order.routes');
 const walletRoutes = require('./routes/wallet.routes');
 const adminRoutes = require('./routes/admin.routes');
+const paymentRoutes = require('./routes/payment.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/stores', storeRoutes);
@@ -94,6 +96,7 @@ app.use('/api/currency', currencyRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/wallets', walletRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/payments', paymentRoutes);
 
 
 // Global error handler
