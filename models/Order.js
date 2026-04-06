@@ -32,12 +32,15 @@ const orderSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'paid', 'shipped', 'delivered', 'completed', 'disputed', 'refunded'],
+    enum: [
+      'pending', 'paid', 'shipped',
+      'delivered', 'completed', 'disputed', 'refunded'
+    ],
     default: 'pending'
   },
   paymentMethod: {
     type: String,
-    enum: ['wallet', 'card'],
+    enum: ['wallet', 'card', 'bank_transfer'],
     default: 'wallet'
   },
   paymentReference: {
