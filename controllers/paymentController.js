@@ -4,17 +4,14 @@ const Escrow = require('../models/Escrow');
 const Wallet = require('../models/Wallet');
 const Notification = require('../models/Notification');
 const { calculateFeeSplit } = require('../services/feeService');
-const { getExchangeRates } = require('../services/currencyService');
+const { getExchangeRates, computePrice } = require('../services/currencyService');
 const {
   initializePayment,
   verifyPayment,
   generateReference,
   createVirtualAccount
 } = require('../services/paystackService');
-const {
-  getExchangeRates,
-  computePrice
-} = require('../services/currencyService');
+
 
 // ─── INITIALIZE CARD PAYMENT ──────────────────────────────
 const initializeCardPayment = async (req, res) => {
