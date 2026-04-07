@@ -15,6 +15,14 @@ const escrowSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  sellerAmount: {
+    type: Number,
+    required: true
+  },
+  platformFee: {
+    type: Number,
+    required: true
+  },
   status: {
     type: String,
     enum: ['held', 'released', 'refunded', 'disputed'],

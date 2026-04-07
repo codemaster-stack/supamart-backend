@@ -3,6 +3,8 @@ const Product = require('../models/Product');
 const Escrow = require('../models/Escrow');
 const Wallet = require('../models/Wallet');
 const Notification = require('../models/Notification');
+const { calculateFeeSplit } = require('../services/feeService');
+const { getExchangeRates } = require('../services/currencyService');
 const {
   initializePayment,
   verifyPayment,
@@ -219,12 +221,23 @@ const verifyCardPayment = async (req, res) => {
       paymentReference: reference
     });
 
-    await Escrow.create({
-      orderId: order._id,
-      currency,
-      amountHeld: totalAmount,
-      status: 'held'
-    });
+    // Get product for fee calculation
+const rates = await getExchangeRates();
+const feeSplit = calculateFeeSplit(
+  product.basePriceNGN,
+  currency,
+  rates,
+  quantity
+);
+
+await Escrow.create({
+  orderId: order._id,
+  currency,
+  amountHeld: totalAmount,
+  sellerAmount: feeSplit.sellerAmount,
+  platformFee: feeSplit.platformFee,
+  status: 'held'
+});
 
     await Notification.create({
       userId: product.sellerId,
@@ -295,12 +308,23 @@ const paystackWebhook = async (req, res) => {
             paymentReference: reference
           });
 
-          await Escrow.create({
-            orderId: order._id,
-            currency,
-            amountHeld: totalAmount,
-            status: 'held'
-          });
+         // Get product for fee calculation
+const rates = await getExchangeRates();
+const feeSplit = calculateFeeSplit(
+  product.basePriceNGN,
+  currency,
+  rates,
+  quantity
+);
+
+await Escrow.create({
+  orderId: order._id,
+  currency,
+  amountHeld: totalAmount,
+  sellerAmount: feeSplit.sellerAmount,
+  platformFee: feeSplit.platformFee,
+  status: 'held'
+});
 
           await Notification.create({
             userId: product.sellerId,

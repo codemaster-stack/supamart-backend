@@ -9,6 +9,17 @@ const Notification = require('../models/Notification');
 // ─── DASHBOARD STATS ──────────────────────────────────────
 const getStats = async (req, res) => {
   try {
+    const adminUser = await User.findOne({ role: 'admin' });
+
+    let platformEarnings = { NGN: 0, USD: 0, GBP: 0, EUR: 0 };
+
+    if (adminUser) {
+      const adminWallets = await Wallet.find({ userId: adminUser._id });
+      adminWallets.forEach(w => {
+        platformEarnings[w.currency] = w.balance;
+      });
+    }
+
     const [
       totalUsers,
       totalSellers,
@@ -32,14 +43,14 @@ const getStats = async (req, res) => {
         totalProducts,
         totalOrders,
         disputedOrders,
-        heldEscrow
+        heldEscrow,
+        platformEarnings
       }
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
 };
-
 // ─── GET ALL USERS ────────────────────────────────────────
 const getAllUsers = async (req, res) => {
   try {
@@ -178,8 +189,32 @@ const releaseEscrow = async (req, res) => {
       });
     }
 
-    sellerWallet.balance += escrow.amountHeld;
-    await sellerWallet.save();
+    // Credit seller their portion
+const sellerAmount = escrow.sellerAmount || escrow.amountHeld * 0.909;
+const platformFee = escrow.platformFee || escrow.amountHeld * 0.091;
+
+sellerWallet.balance += sellerAmount;
+await sellerWallet.save();
+
+// Credit admin platform fee
+const adminUser = await User.findOne({ role: 'admin' });
+if (adminUser) {
+  let adminWallet = await Wallet.findOne({
+    userId: adminUser._id,
+    currency: escrow.currency
+  });
+
+  if (!adminWallet) {
+    adminWallet = await Wallet.create({
+      userId: adminUser._id,
+      currency: escrow.currency,
+      balance: 0
+    });
+  }
+
+  adminWallet.balance += platformFee;
+  await adminWallet.save();
+}
 
     escrow.status = 'released';
     escrow.releasedAt = new Date();

@@ -4,6 +4,8 @@ const Store = require('../models/Store');
 const Escrow = require('../models/Escrow');
 const Wallet = require('../models/Wallet');
 const Notification = require('../models/Notification');
+const User = require('../models/User');
+const { calculateFeeSplit } = require('../services/feeService');
 const { getExchangeRates, computePrice } = require('../services/currencyService');
 const {
   canDeliverToCountry,
@@ -107,12 +109,23 @@ const placeOrder = async (req, res) => {
     });
 
     // Escrow holds product amount + delivery fee
-    await Escrow.create({
-      orderId: order._id,
-      currency,
-      amountHeld: totalWithDelivery,
-      status: 'held'
-    });
+   // Calculate platform fee split
+const feeSplit = calculateFeeSplit(
+  product.basePriceNGN,
+  currency,
+  rates,
+  qty
+);
+
+// Create escrow record with fee split
+await Escrow.create({
+  orderId: order._id,
+  currency,
+  amountHeld: totalAmount,
+  sellerAmount: feeSplit.sellerAmount,
+  platformFee: feeSplit.platformFee,
+  status: 'held'
+});
 
     // Notify seller
     await Notification.create({
@@ -256,8 +269,29 @@ const confirmDelivery = async (req, res) => {
         });
       }
 
-      sellerWallet.balance += escrow.amountHeld;
-      await sellerWallet.save();
+      // Credit seller their amount (base price only)
+sellerWallet.balance += escrow.sellerAmount;
+await sellerWallet.save();
+
+// Credit platform fee to admin wallet
+const adminUser = await User.findOne({ role: 'admin' });
+if (adminUser) {
+  let adminWallet = await Wallet.findOne({
+    userId: adminUser._id,
+    currency: order.currency
+  });
+
+  if (!adminWallet) {
+    adminWallet = await Wallet.create({
+      userId: adminUser._id,
+      currency: order.currency,
+      balance: 0
+    });
+  }
+
+  adminWallet.balance += escrow.platformFee;
+  await adminWallet.save();
+}
 
       // Notify seller
       await Notification.create({

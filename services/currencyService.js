@@ -68,22 +68,47 @@ const formatPrice = (amount, currency) => {
 // Detect currency from country code
 const getCurrencyFromCountry = (countryCode) => {
   const map = {
-    NG: 'NGN',
-    US: 'USD',
-    GB: 'GBP',
-    DE: 'EUR',
-    FR: 'EUR',
-    IT: 'EUR',
-    ES: 'EUR',
-    NL: 'EUR',
-    BE: 'EUR',
-    PT: 'EUR',
-    AT: 'EUR',
-    IE: 'EUR',
-    FI: 'EUR',
-    GR: 'EUR'
+    // NGN
+    'NG': 'NGN',
+
+    // GBP
+    'GB': 'GBP',
+
+    // EUR
+    'DE': 'EUR', 'FR': 'EUR', 'IT': 'EUR',
+    'ES': 'EUR', 'NL': 'EUR', 'BE': 'EUR',
+    'PT': 'EUR', 'AT': 'EUR', 'IE': 'EUR',
+    'FI': 'EUR', 'GR': 'EUR', 'LU': 'EUR',
+    'CY': 'EUR', 'MT': 'EUR', 'SK': 'EUR',
+    'SI': 'EUR', 'EE': 'EUR', 'LV': 'EUR',
+    'LT': 'EUR',
+
+    // USD — US and countries that use USD or default to it
+    'US': 'USD',
+    'GH': 'USD', // Ghana
+    'KE': 'USD', // Kenya
+    'ZA': 'USD', // South Africa
+    'TZ': 'USD', // Tanzania
+    'UG': 'USD', // Uganda
+    'RW': 'USD', // Rwanda
+    'ET': 'USD', // Ethiopia
+    'CM': 'USD', // Cameroon
+    'SN': 'USD', // Senegal
+    'CI': 'USD', // Cote d'Ivoire
+    'CA': 'USD', // Canada
+    'AU': 'USD', // Australia
+    'NZ': 'USD', // New Zealand
+    'SG': 'USD', // Singapore
+    'AE': 'USD', // UAE
+    'SA': 'USD', // Saudi Arabia
+    'IN': 'USD', // India
+    'CN': 'USD', // China
+    'JP': 'USD', // Japan
+    'BR': 'USD', // Brazil
+    'MX': 'USD', // Mexico
   };
-  return map[countryCode] || 'USD';
+
+  return map[countryCode] || 'USD'; // Default to USD for unknown countries
 };
 
 module.exports = {
