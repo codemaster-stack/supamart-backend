@@ -46,6 +46,19 @@ const orderSchema = new mongoose.Schema({
   paymentReference: {
     type: String,
     default: null
+  },
+  deliveryFee: {
+    type: Number,
+    default: 0
+  },
+  deliveryType: {
+    type: String,
+    enum: ['within_city', 'within_state', 'within_country'],
+    default: 'within_country'
+  },
+  deliveryAddress: {
+    type: String,
+    default: ''
   }
 }, { timestamps: true });
 

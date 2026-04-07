@@ -5,6 +5,10 @@ const Escrow = require('../models/Escrow');
 const Wallet = require('../models/Wallet');
 const Notification = require('../models/Notification');
 const { getExchangeRates, computePrice } = require('../services/currencyService');
+const {
+  canDeliverToCountry,
+  getDeliveryFee
+} = require('../services/deliveryService');
 
 // ─── PLACE ORDER ──────────────────────────────────────────
 // POST /api/orders
@@ -45,38 +49,68 @@ const placeOrder = async (req, res) => {
     const unitPrice = computePrice(product.basePriceNGN, currency, rates);
     const totalAmount = unitPrice * qty;
 
+             
+
+    // Check buyer wallet balance
+ // Check buyer and seller are in same country
+    const buyerCountry = req.user.countryCode || 'NG';
+    const sellerStore = await Store.findOne({
+      userId: product.sellerId
+    });
+    const sellerCountry = sellerStore?.countryCode || 'NG';
+
+    if (!canDeliverToCountry(sellerCountry, buyerCountry)) {
+      return res.status(400).json({
+        message: `This seller only delivers within ${sellerStore?.country || 'their country'}. International shipping is not available yet.`
+      });
+    }
+
+    // Get delivery fee
+    const deliveryFees = getDeliveryFee(sellerCountry, currency);
+    const deliveryFee = req.body.deliveryType === 'within_city'
+      ? deliveryFees.withinCity
+      : req.body.deliveryType === 'within_state'
+        ? deliveryFees.withinState
+        : deliveryFees.withinCountry;
+
+    // Add delivery fee to total
+    const totalWithDelivery = totalAmount + deliveryFee;
+
     // Check buyer wallet balance
     const buyerWallet = await Wallet.findOne({
       userId: req.user.id,
       currency
     });
 
-    if (!buyerWallet || buyerWallet.balance < totalAmount) {
+    if (!buyerWallet || buyerWallet.balance < totalWithDelivery) {
       return res.status(400).json({
-        message: `Insufficient ${currency} wallet balance. Required: ${totalAmount.toFixed(2)}`
+        message: `Insufficient ${currency} wallet balance. Required: ${totalWithDelivery.toFixed(2)} (includes delivery fee of ${deliveryFee})`
       });
     }
 
     // Deduct from buyer wallet
-    buyerWallet.balance -= totalAmount;
+    buyerWallet.balance -= totalWithDelivery;
     await buyerWallet.save();
 
     // Create order
-    const order = await Order.create({
+   const order = await Order.create({
       buyerId: req.user.id,
       sellerId: product.sellerId,
       productId: product._id,
       quantity: qty,
       currency,
       amountPaid: totalAmount,
+      deliveryFee,
+      deliveryType: req.body.deliveryType || 'within_country',
+      deliveryAddress: req.body.deliveryAddress || '',
       status: 'paid'
     });
 
-    // Create escrow record — funds held here
+    // Escrow holds product amount + delivery fee
     await Escrow.create({
       orderId: order._id,
       currency,
-      amountHeld: totalAmount,
+      amountHeld: totalWithDelivery,
       status: 'held'
     });
 

@@ -612,6 +612,42 @@ const resolveDispute = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+    // ─── GET ALL WALLETS ──────────────────────────────────────
+const getAllWallets = async (req, res) => {
+  try {
+    const users = await User.find({ role: { $ne: 'admin' } })
+      .select('name email role');
+
+    const result = await Promise.all(users.map(async (user) => {
+      const wallets = await Wallet.find({ userId: user._id });
+      const walletMap = {};
+      wallets.forEach(w => { walletMap[w.currency] = w.balance; });
+
+      return {
+        userId: user._id,
+        userName: user.name,
+        userEmail: user.email,
+        userRole: user.role,
+        NGN: walletMap['NGN'] || 0,
+        USD: walletMap['USD'] || 0,
+        GBP: walletMap['GBP'] || 0,
+        EUR: walletMap['EUR'] || 0
+      };
+    }));
+
+    // Only show users with at least one non-zero balance
+    const withBalance = result.filter(u =>
+      u.NGN > 0 || u.USD > 0 || u.GBP > 0 || u.EUR > 0
+    );
+
+    res.status(200).json({ wallets: withBalance });
+
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   getStats,
   getAllUsers,
@@ -625,5 +661,6 @@ module.exports = {
   getAllDisputes,
   getDispute,
   addDisputeMessage,
-  resolveDispute
+  resolveDispute,
+  getAllWallets
 };

@@ -8,7 +8,7 @@ const storeSchema = new mongoose.Schema({
   },
   businessName: {
     type: String,
-    required: [true, 'Business name is required'],
+    required: true,
     trim: true
   },
   slug: {
@@ -22,16 +22,27 @@ const storeSchema = new mongoose.Schema({
   },
   location: {
     type: String,
-    required: [true, 'Shop location is required']
+    required: true
+  },
+  country: {
+    type: String,
+    default: 'Nigeria'
+  },
+  countryCode: {
+    type: String,
+    default: 'NG'
   },
   phoneNumber: {
     type: String,
-    required: [true, 'Phone number is required']
+    required: true
+  },
+  deliveryFee: {
+    type: Number,
+    default: 0
   },
   isActive: {
     type: Boolean,
     default: true
   }
 }, { timestamps: true });
-
 module.exports = mongoose.model('Store', storeSchema);

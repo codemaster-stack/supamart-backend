@@ -51,13 +51,15 @@ const createStore = async (req, res) => {
 
     // Create the store
     const store = await Store.create({
-      userId: req.user.id,
-      businessName,
-      slug,
-      logoUrl,
-      location,
-      phoneNumber
-    });
+     userId: req.user.id,
+     businessName,
+     slug,
+     logoUrl,
+     location,
+     country: req.body.country || 'Nigeria',
+     countryCode: req.body.countryCode || 'NG',
+     phoneNumber
+     });
 
     // Create 4 wallets for seller if not already created
     const currencies = ['NGN', 'USD', 'GBP', 'EUR'];

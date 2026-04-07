@@ -13,7 +13,8 @@ const {
   getAllDisputes,
   getDispute,
   addDisputeMessage,
-  resolveDispute
+  resolveDispute,
+  getAllWallets
 } = require('../controllers/adminController');
 const { protect, requireRole } = require('../middleware/authMiddleware');
 
@@ -32,5 +33,6 @@ router.get('/disputes', getAllDisputes);
 router.get('/disputes/:id', getDispute);
 router.post('/disputes/:id/message', addDisputeMessage);
 router.post('/disputes/:id/resolve', resolveDispute);
+router.get('/wallets', getAllWallets);
 
 module.exports = router;
