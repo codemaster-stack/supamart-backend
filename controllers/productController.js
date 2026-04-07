@@ -5,14 +5,14 @@ const Store = require('../models/Store');
 // POST /api/products
 const createProduct = async (req, res) => {
   try {
-    const { name, description, basePriceNGN } = req.body;
+  const { name, description, basePriceNGN, stock } = req.body;
 
-    // Validation
-    if (!name || !description || !basePriceNGN) {
-      return res.status(400).json({
-        message: 'Name, description and price are required'
-      });
-    }
+// Validation
+if (!name || !description || !basePriceNGN) {
+  return res.status(400).json({
+    message: 'Name, description and price are required'
+  });
+}
 
     if (isNaN(basePriceNGN) || Number(basePriceNGN) <= 0) {
       return res.status(400).json({
@@ -31,15 +31,16 @@ const createProduct = async (req, res) => {
     // Get uploaded image URLs from Cloudinary
     const images = req.files ? req.files.map(file => file.path) : [];
 
-    // Create product
-    const product = await Product.create({
-      storeId: store._id,
-      sellerId: req.user.id,
-      name,
-      description,
-      images,
-      basePriceNGN: Number(basePriceNGN)
-    });
+   // Create product
+const product = await Product.create({
+  storeId: store._id,
+  sellerId: req.user.id,
+  name,
+  description,
+  images,
+  basePriceNGN: Number(basePriceNGN),
+  stock: Number(stock) || 1
+});
 
     res.status(201).json({
       message: 'Product created successfully',
@@ -161,11 +162,12 @@ const updateProduct = async (req, res) => {
     }
 
     if (name) product.name = name;
-    if (description) product.description = description;
-    if (basePriceNGN) product.basePriceNGN = Number(basePriceNGN);
-    if (req.files && req.files.length > 0) {
-      product.images = req.files.map(file => file.path);
-    }
+if (description) product.description = description;
+if (basePriceNGN) product.basePriceNGN = Number(basePriceNGN);
+if (req.body.stock !== undefined) product.stock = Number(req.body.stock);
+if (req.files && req.files.length > 0) {
+  product.images = req.files.map(file => file.path);
+}
 
     await product.save();
 

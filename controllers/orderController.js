@@ -126,6 +126,20 @@ const placeOrder = async (req, res) => {
       order
     });
 
+    // Deduct stock
+await Product.findByIdAndUpdate(
+  product._id,
+  { $inc: { stock: -qty } }
+);
+
+// Auto deactivate if out of stock
+if (product.stock - qty <= 0) {
+  await Product.findByIdAndUpdate(
+    product._id,
+    { isActive: false }
+  );
+}
+
   } catch (error) {
     console.error('Place order error:', error);
     res.status(500).json({ message: 'Server error while placing order' });

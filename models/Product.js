@@ -29,6 +29,11 @@ const productSchema = new mongoose.Schema({
     required: [true, 'Price is required'],
     min: 0
   },
+  stock: {
+    type: Number,
+    default: 1,
+    min: 0
+  },
   isActive: {
     type: Boolean,
     default: true
